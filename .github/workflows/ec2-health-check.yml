@@ -1,9 +1,9 @@
 name: EC2 Health Check
 
 on:
-  workflow_dispatch:
-  schedule:
-    - cron: "0 1 * * *"   # daily health check (optional)
+  workflow_dispatch:   
+  schedule:            
+    - cron: "0 1 * * *"   
 
 jobs:
   check-ec2:
@@ -37,13 +37,14 @@ jobs:
           echo "Instance state is: $STATE"
           echo "state=$STATE" >> $GITHUB_OUTPUT
 
-      - name: Print result (do not fail)
+      - name: Decide pass or fail
         run: |
           STATE="${{ steps.state.outputs.state }}"
 
           if [ "$STATE" = "running" ]; then
             echo "✅ EC2 instance is RUNNING. Health check passed."
+            exit 0
           else
-            echo "ℹ️ EC2 instance is NOT running (state: $STATE)."
-            echo "ℹ️ This workflow will NOT fail for stopped instances."
+            echo "❌ EC2 instance is NOT running (state: $STATE). Health check FAILED."
+            exit 1
           fi
