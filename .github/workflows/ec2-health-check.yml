@@ -1,0 +1,50 @@
+name: EC2 Health Check
+
+on:
+  workflow_dispatch:   # manual run
+  schedule:            # automatic run once per day
+    - cron: "0 1 * * *"   # runs at 01:00 UTC (06:30 IST approx)
+
+jobs:
+  check-ec2:
+    runs-on: ubuntu-latest
+
+    env:
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      EC2_INSTANCE_ID: ${{ secrets.EC2_INSTANCE_ID }}
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Show AWS identity
+        run: aws sts get-caller-identity
+
+      - name: Get EC2 instance state
+        id: state
+        run: |
+          echo "Checking EC2 instance: $EC2_INSTANCE_ID in region $AWS_REGION"
+
+          STATE=$(aws ec2 describe-instances \
+            --instance-ids "$EC2_INSTANCE_ID" \
+            --query "Reservations[0].Instances[0].State.Name" \
+            --output text)
+
+          echo "Instance state is: $STATE"
+          echo "state=$STATE" >> $GITHUB_OUTPUT
+
+      - name: Decide pass or fail
+        run: |
+          STATE="${{ steps.state.outputs.state }}"
+
+          if [ "$STATE" = "running" ]; then
+            echo "✅ EC2 instance is RUNNING. Health check passed."
+            exit 0
+          else
+            echo "❌ EC2 instance is NOT running (state: $STATE). Health check FAILED."
+            exit 1
+          fi
